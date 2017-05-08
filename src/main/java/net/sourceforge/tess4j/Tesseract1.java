@@ -393,7 +393,7 @@ public class Tesseract1 extends TessAPI1 implements ITesseract {
      * @param pageNum page number; needed for hocr paging.
      * @return the recognized text
      */
-    protected String getOCRText(String filename, int pageNum) {
+    protected synchronized String getOCRText(String filename, int pageNum) {
         if (filename != null && !filename.isEmpty()) {
             TessBaseAPISetInputName(handle, filename);
         }

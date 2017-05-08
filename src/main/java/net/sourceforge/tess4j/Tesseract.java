@@ -1,12 +1,9 @@
 /**
  * Copyright @ 2012 Quan Nguyen
- *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- *
  * http://www.apache.org/licenses/LICENSE-2.0
- *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -15,33 +12,38 @@
  */
 package net.sourceforge.tess4j;
 
+import java.awt.Rectangle;
+import java.awt.image.BufferedImage;
+import java.awt.image.RenderedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Properties;
+
+import javax.imageio.IIOImage;
+
+import org.slf4j.LoggerFactory;
+
 import com.sun.jna.Pointer;
 import com.sun.jna.StringArray;
 import com.sun.jna.ptr.PointerByReference;
-import java.awt.Rectangle;
-import java.awt.image.*;
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
-import java.util.*;
-import javax.imageio.IIOImage;
+
 import net.sourceforge.lept4j.Box;
 import net.sourceforge.lept4j.Boxa;
-import static net.sourceforge.lept4j.ILeptonica.L_CLONE;
+import net.sourceforge.lept4j.ILeptonica;
 import net.sourceforge.lept4j.Leptonica;
-import static net.sourceforge.tess4j.ITessAPI.FALSE;
-import static net.sourceforge.tess4j.ITessAPI.TRUE;
-
 import net.sourceforge.tess4j.ITessAPI.TessBaseAPI;
 import net.sourceforge.tess4j.ITessAPI.TessOcrEngineMode;
 import net.sourceforge.tess4j.ITessAPI.TessPageIterator;
 import net.sourceforge.tess4j.ITessAPI.TessResultIterator;
 import net.sourceforge.tess4j.ITessAPI.TessResultRenderer;
-
 import net.sourceforge.tess4j.util.ImageIOHelper;
 import net.sourceforge.tess4j.util.LoggHelper;
 import net.sourceforge.tess4j.util.PdfUtilities;
-import org.slf4j.*;
 
 /**
  * An object layer on top of <code>TessAPI</code>, provides character
@@ -73,7 +75,8 @@ public class Tesseract implements ITesseract {
     private TessAPI api;
     private TessBaseAPI handle;
 
-    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(new LoggHelper().toString());
+    private static final org.slf4j.Logger logger = LoggerFactory
+        .getLogger(new LoggHelper().toString());
 
     /**
      * Returns TessAPI object.
@@ -81,7 +84,7 @@ public class Tesseract implements ITesseract {
      * @return api
      */
     protected TessAPI getAPI() {
-        return api;
+        return this.api;
     }
 
     /**
@@ -90,7 +93,7 @@ public class Tesseract implements ITesseract {
      * @return handle
      */
     protected TessBaseAPI getHandle() {
-        return handle;
+        return this.handle;
     }
 
     /**
@@ -101,17 +104,18 @@ public class Tesseract implements ITesseract {
      */
     @Deprecated
     public static synchronized Tesseract getInstance() {
-        if (instance == null) {
-            instance = new Tesseract();
+        if (Tesseract.instance == null) {
+            Tesseract.instance = new Tesseract();
         }
 
-        return instance;
+        return Tesseract.instance;
     }
 
     /**
      * Sets path to <code>tessdata</code>.
      *
-     * @param datapath the tessdata path to set
+     * @param datapath
+     *        the tessdata path to set
      */
     @Override
     public void setDatapath(String datapath) {
@@ -121,7 +125,8 @@ public class Tesseract implements ITesseract {
     /**
      * Sets language for OCR.
      *
-     * @param language the language code, which follows ISO 639-3 standard.
+     * @param language
+     *        the language code, which follows ISO 639-3 standard.
      */
     @Override
     public void setLanguage(String language) {
@@ -131,7 +136,8 @@ public class Tesseract implements ITesseract {
     /**
      * Sets OCR engine mode.
      *
-     * @param ocrEngineMode the OcrEngineMode to set
+     * @param ocrEngineMode
+     *        the OcrEngineMode to set
      */
     @Override
     public void setOcrEngineMode(int ocrEngineMode) {
@@ -141,7 +147,8 @@ public class Tesseract implements ITesseract {
     /**
      * Sets page segmentation mode.
      *
-     * @param mode the page segmentation mode to set
+     * @param mode
+     *        the page segmentation mode to set
      */
     @Override
     public void setPageSegMode(int mode) {
@@ -151,68 +158,78 @@ public class Tesseract implements ITesseract {
     /**
      * Enables hocr output.
      *
-     * @param hocr to enable or disable hocr output
+     * @param hocr
+     *        to enable or disable hocr output
      */
     public void setHocr(boolean hocr) {
         this.renderedFormat = hocr ? RenderedFormat.HOCR : RenderedFormat.TEXT;
-        prop.setProperty("tessedit_create_hocr", hocr ? "1" : "0");
+        this.prop.setProperty("tessedit_create_hocr", hocr ? "1" : "0");
     }
 
     /**
      * Set the value of Tesseract's internal parameter.
      *
-     * @param key variable name, e.g., <code>tessedit_create_hocr</code>,
-     * <code>tessedit_char_whitelist</code>, etc.
-     * @param value value for corresponding variable, e.g., "1", "0",
-     * "0123456789", etc.
+     * @param key
+     *        variable name, e.g., <code>tessedit_create_hocr</code>,
+     *        <code>tessedit_char_whitelist</code>, etc.
+     * @param value
+     *        value for corresponding variable, e.g., "1", "0",
+     *        "0123456789", etc.
      */
     @Override
     public void setTessVariable(String key, String value) {
-        prop.setProperty(key, value);
+        this.prop.setProperty(key, value);
     }
 
     /**
      * Sets configs to be passed to Tesseract's <code>Init</code> method.
      *
-     * @param configs list of config filenames, e.g., "digits", "bazaar",
-     * "quiet"
+     * @param configs
+     *        list of config filenames, e.g., "digits", "bazaar",
+     *        "quiet"
      */
     @Override
     public void setConfigs(List<String> configs) {
-        configList.clear();
+        this.configList.clear();
         if (configs != null) {
-            configList.addAll(configs);
+            this.configList.addAll(configs);
         }
     }
 
     /**
      * Performs OCR operation.
      *
-     * @param imageFile an image file
+     * @param imageFile
+     *        an image file
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
     public String doOCR(File imageFile) throws TesseractException {
-        return doOCR(imageFile, null);
+        return this.doOCR(imageFile, null);
     }
 
     /**
      * Performs OCR operation.
      *
-     * @param imageFile an image file
-     * @param rect the bounding rectangle defines the region of the image to be
-     * recognized. A rectangle of zero dimension or <code>null</code> indicates
-     * the whole image.
+     * @param imageFile
+     *        an image file
+     * @param rect
+     *        the bounding rectangle defines the region of the image to be
+     *        recognized. A rectangle of zero dimension or <code>null</code>
+     *        indicates
+     *        the whole image.
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
-    public String doOCR(File imageFile, Rectangle rect) throws TesseractException {
+    public String doOCR(File imageFile, Rectangle rect)
+            throws TesseractException {
         try {
-            return doOCR(ImageIOHelper.getIIOImageList(imageFile), imageFile.getPath(), rect);
+            return this.doOCR(ImageIOHelper.getIIOImageList(imageFile),
+                imageFile.getPath(), rect);
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            Tesseract.logger.error(e.getMessage(), e);
             throw new TesseractException(e);
         }
     }
@@ -220,31 +237,36 @@ public class Tesseract implements ITesseract {
     /**
      * Performs OCR operation.
      *
-     * @param bi a buffered image
+     * @param bi
+     *        a buffered image
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
     public String doOCR(BufferedImage bi) throws TesseractException {
-        return doOCR(bi, null);
+        return this.doOCR(bi, null);
     }
 
     /**
      * Performs OCR operation.
      *
-     * @param bi a buffered image
-     * @param rect the bounding rectangle defines the region of the image to be
-     * recognized. A rectangle of zero dimension or <code>null</code> indicates
-     * the whole image.
+     * @param bi
+     *        a buffered image
+     * @param rect
+     *        the bounding rectangle defines the region of the image to be
+     *        recognized. A rectangle of zero dimension or <code>null</code>
+     *        indicates
+     *        the whole image.
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
-    public String doOCR(BufferedImage bi, Rectangle rect) throws TesseractException {
+    public String doOCR(BufferedImage bi, Rectangle rect)
+            throws TesseractException {
         try {
-            return doOCR(ImageIOHelper.getIIOImageList(bi), rect);
+            return this.doOCR(ImageIOHelper.getIIOImageList(bi), rect);
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            Tesseract.logger.error(e.getMessage(), e);
             throw new TesseractException(e);
         }
     }
@@ -252,34 +274,43 @@ public class Tesseract implements ITesseract {
     /**
      * Performs OCR operation.
      *
-     * @param imageList a list of <code>IIOImage</code> objects
-     * @param rect the bounding rectangle defines the region of the image to be
-     * recognized. A rectangle of zero dimension or <code>null</code> indicates
-     * the whole image.
+     * @param imageList
+     *        a list of <code>IIOImage</code> objects
+     * @param rect
+     *        the bounding rectangle defines the region of the image to be
+     *        recognized. A rectangle of zero dimension or <code>null</code>
+     *        indicates
+     *        the whole image.
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
-    public String doOCR(List<IIOImage> imageList, Rectangle rect) throws TesseractException {
-        return doOCR(imageList, null, rect);
+    public String doOCR(List<IIOImage> imageList, Rectangle rect)
+            throws TesseractException {
+        return this.doOCR(imageList, null, rect);
     }
 
     /**
      * Performs OCR operation.
      *
-     * @param imageList a list of <code>IIOImage</code> objects
-     * @param filename input file name. Needed only for training and reading a
-     * UNLV zone file.
-     * @param rect the bounding rectangle defines the region of the image to be
-     * recognized. A rectangle of zero dimension or <code>null</code> indicates
-     * the whole image.
+     * @param imageList
+     *        a list of <code>IIOImage</code> objects
+     * @param filename
+     *        input file name. Needed only for training and reading a
+     *        UNLV zone file.
+     * @param rect
+     *        the bounding rectangle defines the region of the image to be
+     *        recognized. A rectangle of zero dimension or <code>null</code>
+     *        indicates
+     *        the whole image.
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
-    public String doOCR(List<IIOImage> imageList, String filename, Rectangle rect) throws TesseractException {
-        init();
-        setTessVariables();
+    public String doOCR(List<IIOImage> imageList, String filename,
+            Rectangle rect) throws TesseractException {
+        this.init();
+        this.setTessVariables();
 
         try {
             StringBuilder sb = new StringBuilder();
@@ -288,21 +319,22 @@ public class Tesseract implements ITesseract {
             for (IIOImage oimage : imageList) {
                 pageNum++;
                 try {
-                    setImage(oimage.getRenderedImage(), rect);
-                    sb.append(getOCRText(filename, pageNum));
+                    this.setImage(oimage.getRenderedImage(), rect);
+                    sb.append(this.getOCRText(filename, pageNum));
                 } catch (IOException ioe) {
                     // skip the problematic image
-                    logger.error(ioe.getMessage(), ioe);
+                    Tesseract.logger.error(ioe.getMessage(), ioe);
                 }
             }
 
-            if (renderedFormat == RenderedFormat.HOCR) {
-                sb.insert(0, htmlBeginTag).append(htmlEndTag);
+            if (this.renderedFormat == RenderedFormat.HOCR) {
+                sb.insert(0, ITesseract.htmlBeginTag)
+                    .append(ITesseract.htmlEndTag);
             }
 
             return sb.toString();
         } finally {
-            dispose();
+            this.dispose();
         }
     }
 
@@ -311,20 +343,27 @@ public class Tesseract implements ITesseract {
      * <code>SetRectangle</code>, and one or more of the <code>Get*Text</code>
      * functions.
      *
-     * @param xsize width of image
-     * @param ysize height of image
-     * @param buf pixel data
-     * @param rect the bounding rectangle defines the region of the image to be
-     * recognized. A rectangle of zero dimension or <code>null</code> indicates
-     * the whole image.
-     * @param bpp bits per pixel, represents the bit depth of the image, with 1
-     * for binary bitmap, 8 for gray, and 24 for color RGB.
+     * @param xsize
+     *        width of image
+     * @param ysize
+     *        height of image
+     * @param buf
+     *        pixel data
+     * @param rect
+     *        the bounding rectangle defines the region of the image to be
+     *        recognized. A rectangle of zero dimension or <code>null</code>
+     *        indicates
+     *        the whole image.
+     * @param bpp
+     *        bits per pixel, represents the bit depth of the image, with 1
+     *        for binary bitmap, 8 for gray, and 24 for color RGB.
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
-    public String doOCR(int xsize, int ysize, ByteBuffer buf, Rectangle rect, int bpp) throws TesseractException {
-        return doOCR(xsize, ysize, buf, null, rect, bpp);
+    public String doOCR(int xsize, int ysize, ByteBuffer buf, Rectangle rect,
+            int bpp) throws TesseractException {
+        return this.doOCR(xsize, ysize, buf, null, rect, bpp);
     }
 
     /**
@@ -332,32 +371,40 @@ public class Tesseract implements ITesseract {
      * <code>SetRectangle</code>, and one or more of the <code>Get*Text</code>
      * functions.
      *
-     * @param xsize width of image
-     * @param ysize height of image
-     * @param buf pixel data
-     * @param filename input file name. Needed only for training and reading a
-     * UNLV zone file.
-     * @param rect the bounding rectangle defines the region of the image to be
-     * recognized. A rectangle of zero dimension or <code>null</code> indicates
-     * the whole image.
-     * @param bpp bits per pixel, represents the bit depth of the image, with 1
-     * for binary bitmap, 8 for gray, and 24 for color RGB.
+     * @param xsize
+     *        width of image
+     * @param ysize
+     *        height of image
+     * @param buf
+     *        pixel data
+     * @param filename
+     *        input file name. Needed only for training and reading a
+     *        UNLV zone file.
+     * @param rect
+     *        the bounding rectangle defines the region of the image to be
+     *        recognized. A rectangle of zero dimension or <code>null</code>
+     *        indicates
+     *        the whole image.
+     * @param bpp
+     *        bits per pixel, represents the bit depth of the image, with 1
+     *        for binary bitmap, 8 for gray, and 24 for color RGB.
      * @return the recognized text
      * @throws TesseractException
      */
     @Override
-    public String doOCR(int xsize, int ysize, ByteBuffer buf, String filename, Rectangle rect, int bpp) throws TesseractException {
-        init();
-        setTessVariables();
+    public String doOCR(int xsize, int ysize, ByteBuffer buf, String filename,
+            Rectangle rect, int bpp) throws TesseractException {
+        this.init();
+        this.setTessVariables();
 
         try {
-            setImage(xsize, ysize, buf, rect, bpp);
-            return getOCRText(filename, 1);
+            this.setImage(xsize, ysize, buf, rect, bpp);
+            return this.getOCRText(filename, 1);
         } catch (Exception e) {
-            logger.error(e.getMessage(), e);
+            Tesseract.logger.error(e.getMessage(), e);
             throw new TesseractException(e);
         } finally {
-            dispose();
+            this.dispose();
         }
     }
 
@@ -365,14 +412,16 @@ public class Tesseract implements ITesseract {
      * Initializes Tesseract engine.
      */
     protected void init() {
-        api = TessAPI.INSTANCE;
-        handle = api.TessBaseAPICreate();
-        StringArray sarray = new StringArray(configList.toArray(new String[0]));
+        this.api = TessAPI.INSTANCE;
+        this.handle = this.api.TessBaseAPICreate();
+        StringArray sarray = new StringArray(
+            this.configList.toArray(new String[0]));
         PointerByReference configs = new PointerByReference();
         configs.setPointer(sarray);
-        api.TessBaseAPIInit1(handle, datapath, language, ocrEngineMode, configs, configList.size());
-        if (psm > -1) {
-            api.TessBaseAPISetPageSegMode(handle, psm);
+        this.api.TessBaseAPIInit1(this.handle, this.datapath, this.language,
+            this.ocrEngineMode, configs, this.configList.size());
+        if (this.psm > -1) {
+            this.api.TessBaseAPISetPageSegMode(this.handle, this.psm);
         }
     }
 
@@ -380,63 +429,81 @@ public class Tesseract implements ITesseract {
      * Sets Tesseract's internal parameters.
      */
     protected void setTessVariables() {
-        Enumeration<?> em = prop.propertyNames();
+        Enumeration<?> em = this.prop.propertyNames();
         while (em.hasMoreElements()) {
             String key = (String) em.nextElement();
-            api.TessBaseAPISetVariable(handle, key, prop.getProperty(key));
+            this.api.TessBaseAPISetVariable(this.handle, key,
+                this.prop.getProperty(key));
         }
     }
 
     /**
      * A wrapper for {@link #setImage(int, int, ByteBuffer, Rectangle, int)}.
      *
-     * @param image a rendered image
-     * @param rect region of interest
+     * @param image
+     *        a rendered image
+     * @param rect
+     *        region of interest
      * @throws java.io.IOException
      */
-    protected void setImage(RenderedImage image, Rectangle rect) throws IOException {
-        setImage(image.getWidth(), image.getHeight(), ImageIOHelper.getImageByteBuffer(image), rect, image
-                .getColorModel().getPixelSize());
+    protected void setImage(RenderedImage image, Rectangle rect)
+            throws IOException {
+        this.setImage(image.getWidth(), image.getHeight(),
+            ImageIOHelper.getImageByteBuffer(image), rect,
+            image.getColorModel().getPixelSize());
     }
 
     /**
      * Sets image to be processed.
      *
-     * @param xsize width of image
-     * @param ysize height of image
-     * @param buf pixel data
-     * @param rect the bounding rectangle defines the region of the image to be
-     * recognized. A rectangle of zero dimension or <code>null</code> indicates
-     * the whole image.
-     * @param bpp bits per pixel, represents the bit depth of the image, with 1
-     * for binary bitmap, 8 for gray, and 24 for color RGB.
+     * @param xsize
+     *        width of image
+     * @param ysize
+     *        height of image
+     * @param buf
+     *        pixel data
+     * @param rect
+     *        the bounding rectangle defines the region of the image to be
+     *        recognized. A rectangle of zero dimension or <code>null</code>
+     *        indicates
+     *        the whole image.
+     * @param bpp
+     *        bits per pixel, represents the bit depth of the image, with 1
+     *        for binary bitmap, 8 for gray, and 24 for color RGB.
      */
-    protected void setImage(int xsize, int ysize, ByteBuffer buf, Rectangle rect, int bpp) {
+    protected void setImage(int xsize, int ysize, ByteBuffer buf,
+            Rectangle rect, int bpp) {
         int bytespp = bpp / 8;
         int bytespl = (int) Math.ceil(xsize * bpp / 8.0);
-        api.TessBaseAPISetImage(handle, buf, xsize, ysize, bytespp, bytespl);
+        this.api.TessBaseAPISetImage(this.handle, buf, xsize, ysize, bytespp,
+            bytespl);
 
         if (rect != null && !rect.isEmpty()) {
-            api.TessBaseAPISetRectangle(handle, rect.x, rect.y, rect.width, rect.height);
+            this.api.TessBaseAPISetRectangle(this.handle, rect.x, rect.y,
+                rect.width, rect.height);
         }
     }
 
     /**
      * Gets recognized text.
      *
-     * @param filename input file name. Needed only for reading a UNLV zone
-     * file.
-     * @param pageNum page number; needed for hocr paging.
+     * @param filename
+     *        input file name. Needed only for reading a UNLV zone
+     *        file.
+     * @param pageNum
+     *        page number; needed for hocr paging.
      * @return the recognized text
      */
-    protected String getOCRText(String filename, int pageNum) {
+    protected synchronized String getOCRText(String filename, int pageNum) {
         if (filename != null && !filename.isEmpty()) {
-            api.TessBaseAPISetInputName(handle, filename);
+            this.api.TessBaseAPISetInputName(this.handle, filename);
         }
 
-        Pointer utf8Text = renderedFormat == RenderedFormat.HOCR ? api.TessBaseAPIGetHOCRText(handle, pageNum - 1) : api.TessBaseAPIGetUTF8Text(handle);
+        Pointer utf8Text = this.renderedFormat == RenderedFormat.HOCR
+            ? this.api.TessBaseAPIGetHOCRText(this.handle, pageNum - 1)
+            : this.api.TessBaseAPIGetUTF8Text(this.handle);
         String str = utf8Text.getString(0);
-        api.TessDeleteText(utf8Text);
+        this.api.TessDeleteText(utf8Text);
         return str;
     }
 
@@ -447,46 +514,58 @@ public class Tesseract implements ITesseract {
      * @param formats
      * @return
      */
-    private TessResultRenderer createRenderers(String outputbase, List<RenderedFormat> formats) {
+    private TessResultRenderer createRenderers(String outputbase,
+            List<RenderedFormat> formats) {
         TessResultRenderer renderer = null;
 
         for (RenderedFormat format : formats) {
             switch (format) {
                 case TEXT:
                     if (renderer == null) {
-                        renderer = api.TessTextRendererCreate(outputbase);
+                        renderer = this.api.TessTextRendererCreate(outputbase);
                     } else {
-                        api.TessResultRendererInsert(renderer, api.TessTextRendererCreate(outputbase));
+                        this.api.TessResultRendererInsert(renderer,
+                            this.api.TessTextRendererCreate(outputbase));
                     }
                     break;
                 case HOCR:
                     if (renderer == null) {
-                        renderer = api.TessHOcrRendererCreate(outputbase);
+                        renderer = this.api.TessHOcrRendererCreate(outputbase);
                     } else {
-                        api.TessResultRendererInsert(renderer, api.TessHOcrRendererCreate(outputbase));
+                        this.api.TessResultRendererInsert(renderer,
+                            this.api.TessHOcrRendererCreate(outputbase));
                     }
                     break;
                 case PDF:
-                    String dataPath = api.TessBaseAPIGetDatapath(handle);
-                    boolean textonly = String.valueOf(TRUE).equals(prop.getProperty("textonly_pdf"));
+                    String dataPath = this.api
+                        .TessBaseAPIGetDatapath(this.handle);
+                    boolean textonly = String.valueOf(ITessAPI.TRUE)
+                        .equals(this.prop.getProperty("textonly_pdf"));
                     if (renderer == null) {
-                        renderer = api.TessPDFRendererCreate(outputbase, dataPath, textonly ? TRUE : FALSE);
+                        renderer = this.api.TessPDFRendererCreate(outputbase,
+                            dataPath,
+                            textonly ? ITessAPI.TRUE : ITessAPI.FALSE);
                     } else {
-                        api.TessResultRendererInsert(renderer, api.TessPDFRendererCreate(outputbase, dataPath, textonly ? TRUE : FALSE));
+                        this.api.TessResultRendererInsert(renderer,
+                            this.api.TessPDFRendererCreate(outputbase, dataPath,
+                                textonly ? ITessAPI.TRUE : ITessAPI.FALSE));
                     }
                     break;
                 case BOX:
                     if (renderer == null) {
-                        renderer = api.TessBoxTextRendererCreate(outputbase);
+                        renderer = this.api
+                            .TessBoxTextRendererCreate(outputbase);
                     } else {
-                        api.TessResultRendererInsert(renderer, api.TessBoxTextRendererCreate(outputbase));
+                        this.api.TessResultRendererInsert(renderer,
+                            this.api.TessBoxTextRendererCreate(outputbase));
                     }
                     break;
                 case UNLV:
                     if (renderer == null) {
-                        renderer = api.TessUnlvRendererCreate(outputbase);
+                        renderer = this.api.TessUnlvRendererCreate(outputbase);
                     } else {
-                        api.TessResultRendererInsert(renderer, api.TessUnlvRendererCreate(outputbase));
+                        this.api.TessResultRendererInsert(renderer,
+                            this.api.TessUnlvRendererCreate(outputbase));
                     }
                     break;
             }
@@ -498,32 +577,41 @@ public class Tesseract implements ITesseract {
     /**
      * Creates documents for given renderer.
      *
-     * @param filename input image
-     * @param outputbase output filename without extension
-     * @param formats types of renderer
+     * @param filename
+     *        input image
+     * @param outputbase
+     *        output filename without extension
+     * @param formats
+     *        types of renderer
      * @throws TesseractException
      */
     @Override
-    public void createDocuments(String filename, String outputbase, List<RenderedFormat> formats) throws TesseractException {
-        createDocuments(new String[]{filename}, new String[]{outputbase}, formats);
+    public void createDocuments(String filename, String outputbase,
+            List<RenderedFormat> formats) throws TesseractException {
+        this.createDocuments(new String[] { filename },
+            new String[] { outputbase }, formats);
     }
 
     /**
      * Creates documents.
      *
-     * @param filenames array of input files
-     * @param outputbases array of output filenames without extension
-     * @param formats types of renderer
+     * @param filenames
+     *        array of input files
+     * @param outputbases
+     *        array of output filenames without extension
+     * @param formats
+     *        types of renderer
      * @throws TesseractException
      */
     @Override
-    public void createDocuments(String[] filenames, String[] outputbases, List<RenderedFormat> formats) throws TesseractException {
+    public void createDocuments(String[] filenames, String[] outputbases,
+            List<RenderedFormat> formats) throws TesseractException {
         if (filenames.length != outputbases.length) {
             throw new RuntimeException("The two arrays must match in length.");
         }
 
-        init();
-        setTessVariables();
+        this.init();
+        this.setTessVariables();
 
         try {
             for (int i = 0; i < filenames.length; i++) {
@@ -533,16 +621,18 @@ public class Tesseract implements ITesseract {
 
                     // if PDF, convert to multi-page TIFF
                     if (filename.toLowerCase().endsWith(".pdf")) {
-                        workingTiffFile = PdfUtilities.convertPdf2Tiff(new File(filename));
+                        workingTiffFile = PdfUtilities
+                            .convertPdf2Tiff(new File(filename));
                         filename = workingTiffFile.getPath();
                     }
 
-                    TessResultRenderer renderer = createRenderers(outputbases[i], formats);
-                    createDocuments(filename, renderer);
-                    api.TessDeleteResultRenderer(renderer);
+                    TessResultRenderer renderer = this
+                        .createRenderers(outputbases[i], formats);
+                    this.createDocuments(filename, renderer);
+                    this.api.TessDeleteResultRenderer(renderer);
                 } catch (Exception e) {
                     // skip the problematic image file
-                    logger.error(e.getMessage(), e);
+                    Tesseract.logger.error(e.getMessage(), e);
                 } finally {
                     if (workingTiffFile != null && workingTiffFile.exists()) {
                         workingTiffFile.delete();
@@ -550,20 +640,24 @@ public class Tesseract implements ITesseract {
                 }
             }
         } finally {
-            dispose();
+            this.dispose();
         }
     }
 
     /**
      * Creates documents.
      *
-     * @param filename input file
-     * @param renderer renderer
+     * @param filename
+     *        input file
+     * @param renderer
+     *        renderer
      * @throws TesseractException
      */
-    private void createDocuments(String filename, TessResultRenderer renderer) throws TesseractException {
-        api.TessBaseAPISetInputName(handle, filename); //for reading a UNLV zone file
-        int result = api.TessBaseAPIProcessPages(handle, filename, null, 0, renderer);
+    private void createDocuments(String filename, TessResultRenderer renderer)
+            throws TesseractException {
+        this.api.TessBaseAPISetInputName(this.handle, filename); //for reading a UNLV zone file
+        int result = this.api.TessBaseAPIProcessPages(this.handle, filename,
+            null, 0, renderer);
 
         if (result == ITessAPI.FALSE) {
             throw new TesseractException("Error during processing page.");
@@ -573,25 +667,29 @@ public class Tesseract implements ITesseract {
     /**
      * Gets segmented regions at specified page iterator level.
      *
-     * @param bi input image
-     * @param pageIteratorLevel TessPageIteratorLevel enum
+     * @param bi
+     *        input image
+     * @param pageIteratorLevel
+     *        TessPageIteratorLevel enum
      * @return list of <code>Rectangle</code>
      * @throws TesseractException
      */
     @Override
-    public List<Rectangle> getSegmentedRegions(BufferedImage bi, int pageIteratorLevel) throws TesseractException {
-        init();
-        setTessVariables();
+    public List<Rectangle> getSegmentedRegions(BufferedImage bi,
+            int pageIteratorLevel) throws TesseractException {
+        this.init();
+        this.setTessVariables();
 
         try {
             List<Rectangle> list = new ArrayList<Rectangle>();
-            setImage(bi, null);
+            this.setImage(bi, null);
 
-            Boxa boxes = api.TessBaseAPIGetComponentImages(handle, pageIteratorLevel, TRUE, null, null);
+            Boxa boxes = this.api.TessBaseAPIGetComponentImages(this.handle,
+                pageIteratorLevel, ITessAPI.TRUE, null, null);
             Leptonica leptInstance = Leptonica.INSTANCE;
             int boxCount = leptInstance.boxaGetCount(boxes);
             for (int i = 0; i < boxCount; i++) {
-                Box box = leptInstance.boxaGetBox(boxes, i, L_CLONE);
+                Box box = leptInstance.boxaGetBox(boxes, i, ILeptonica.L_CLONE);
                 if (box == null) {
                     continue;
                 }
@@ -608,18 +706,20 @@ public class Tesseract implements ITesseract {
             return list;
         } catch (IOException ioe) {
             // skip the problematic image
-            logger.error(ioe.getMessage(), ioe);
+            Tesseract.logger.error(ioe.getMessage(), ioe);
             throw new TesseractException(ioe);
         } finally {
-            dispose();
+            this.dispose();
         }
     }
 
     /**
      * Gets recognized words at specified page iterator level.
      *
-     * @param bi input image
-     * @param pageIteratorLevel TessPageIteratorLevel enum
+     * @param bi
+     *        input image
+     * @param pageIteratorLevel
+     *        TessPageIteratorLevel enum
      * @return list of <code>Word</code>
      */
     @Override
@@ -630,36 +730,43 @@ public class Tesseract implements ITesseract {
         List<Word> words = new ArrayList<Word>();
 
         try {
-            setImage(bi, null);
+            this.setImage(bi, null);
 
-            api.TessBaseAPIRecognize(handle, null);
-            TessResultIterator ri = api.TessBaseAPIGetIterator(handle);
-            TessPageIterator pi = api.TessResultIteratorGetPageIterator(ri);
-            api.TessPageIteratorBegin(pi);
+            this.api.TessBaseAPIRecognize(this.handle, null);
+            TessResultIterator ri = this.api
+                .TessBaseAPIGetIterator(this.handle);
+            TessPageIterator pi = this.api
+                .TessResultIteratorGetPageIterator(ri);
+            this.api.TessPageIteratorBegin(pi);
 
             do {
-                Pointer ptr = api.TessResultIteratorGetUTF8Text(ri, pageIteratorLevel);
+                Pointer ptr = this.api.TessResultIteratorGetUTF8Text(ri,
+                    pageIteratorLevel);
                 String text = ptr.getString(0);
-                api.TessDeleteText(ptr);
-                float confidence = api.TessResultIteratorConfidence(ri, pageIteratorLevel);
+                this.api.TessDeleteText(ptr);
+                float confidence = this.api.TessResultIteratorConfidence(ri,
+                    pageIteratorLevel);
                 IntBuffer leftB = IntBuffer.allocate(1);
                 IntBuffer topB = IntBuffer.allocate(1);
                 IntBuffer rightB = IntBuffer.allocate(1);
                 IntBuffer bottomB = IntBuffer.allocate(1);
-                api.TessPageIteratorBoundingBox(pi, pageIteratorLevel, leftB, topB, rightB, bottomB);
+                this.api.TessPageIteratorBoundingBox(pi, pageIteratorLevel,
+                    leftB, topB, rightB, bottomB);
                 int left = leftB.get();
                 int top = topB.get();
                 int right = rightB.get();
                 int bottom = bottomB.get();
-                Word word = new Word(text, confidence, new Rectangle(left, top, right - left, bottom - top));
+                Word word = new Word(text, confidence,
+                    new Rectangle(left, top, right - left, bottom - top));
                 words.add(word);
-            } while (api.TessPageIteratorNext(pi, pageIteratorLevel) == TRUE);
+            } while (this.api.TessPageIteratorNext(pi,
+                pageIteratorLevel) == ITessAPI.TRUE);
 
             return words;
         } catch (Exception e) {
             return words;
         } finally {
-            dispose();
+            this.dispose();
         }
     }
 
@@ -667,6 +774,6 @@ public class Tesseract implements ITesseract {
      * Releases all of the native resources used by this instance.
      */
     protected void dispose() {
-        api.TessBaseAPIDelete(handle);
+        this.api.TessBaseAPIDelete(this.handle);
     }
 }
